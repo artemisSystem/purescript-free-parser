@@ -14,24 +14,27 @@ import Control.Alternative (class Alternative)
 import Control.Applicative.Free.Trans (FreeAT)
 import Control.Applicative.Free.Trans (liftF) as Exports
 import Control.Applicative.Free.Trans as Applicative
-import Data.Foldable (foldMap, oneOfMap)
-import Data.Functor.Compose (Compose(..))
-import Data.Newtype (un)
+import Data.Either (Either(..))
+import Data.Foldable (fold, oneOf)
+import Data.Functor.Coproduct (Coproduct(..))
 
-type FreeAltT f g = FreeAT f (Compose Array g)
+type FreeAltT f g = FreeAT f (Coproduct Array g)
 
 liftOuter ∷ ∀ f g. Functor g ⇒ g ~> FreeAltT f g
-liftOuter f = Applicative.liftOuter (Compose [ f ])
+liftOuter f = Applicative.liftOuter (Coproduct (Right f))
 
 matchFree
   ∷ ∀ f g r
   . Functor g
   ⇒ (∀ x y. f x → r (x → y) → r y)
+  → (∀ x y. Array (r x) → r (x → y) → r y)
+  → (∀ x y. g (r x) → r (x → y) → r y)
   → (∀ x. x → r x)
-  → (∀ x. Array (g (r x)) → r x)
   → (FreeAltT f g ~> r)
-matchFree apply' pure' natG =
-  Applicative.matchFree apply' pure' (natG <<< un Compose)
+matchFree applyCis applyTransLeft applyTransRight =
+  Applicative.matchFree applyCis case _ of
+    Coproduct (Left array) → applyTransLeft array
+    Coproduct (Right g) → applyTransRight g
 
 runFree
   ∷ ∀ f g h
@@ -40,7 +43,9 @@ runFree
   ⇒ (f ~> h)
   → (∀ x. g (h x) → h x)
   → (FreeAltT f g ~> h)
-runFree natF natG = Applicative.runFree natF (oneOfMap natG <<< un Compose)
+runFree natF natG = Applicative.runFree natF case _ of
+  Coproduct (Left array) → oneOf array
+  Coproduct (Right g) → natG g
 
 foldFree
   ∷ ∀ f g m a
@@ -49,4 +54,7 @@ foldFree
   ⇒ (∀ x. f x → m)
   → (g m → m)
   → (FreeAltT f g a → m)
-foldFree foldF foldG = Applicative.foldFree foldF (foldMap foldG <<< un Compose)
+foldFree foldF foldG = Applicative.foldFree foldF case _ of
+  Coproduct (Left array) → fold array
+  Coproduct (Right g) → foldG g
+

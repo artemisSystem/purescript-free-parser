@@ -2,72 +2,87 @@ module Control.Applicative.Free.Trans where
 
 import Prelude
 
-import Control.Alt (class Alt, alt)
+import Control.Alt (class Alt, (<|>))
 import Control.Alternative (class Alternative)
 import Control.Plus (class Plus, empty)
 import Data.Const (Const(..))
+import Data.Either (Either(..))
 import Data.Exists (Exists, mkExists, runExists)
+import Data.Functor.Coproduct (Coproduct(..))
 import Data.Newtype (un)
 
 runExists' ∷ ∀ f r. Exists f → (∀ a. f a → r) → r
 runExists' x f = runExists f x
 
-data ApplyF f g b a = ApplyF (f a) (FreeAT f g (a → b))
+newtype ViaPlus ∷ ∀ k. (k → Type) → k → Type
+newtype ViaPlus f a = ViaPlus (f a)
 
-data ApplicativeF f g a = Pure a | Apply (Exists (ApplyF f g a))
+derive newtype instance Functor f ⇒ Functor (ViaPlus f)
+instance (Plus f, Applicative f) ⇒ LiftAlt (ViaPlus f) where
+  liftAlt a b = ViaPlus (pure a <|> pure b)
+  empty' = ViaPlus empty
 
-newtype FreeAT f g a = FreeAT (g (ApplicativeF f g a))
+class LiftAlt f where
+  liftAlt ∷ ∀ a. a → a → f a
+  empty' ∷ ∀ a. f a
 
--- ApplicativeF instances
-instance Functor g ⇒ Functor (ApplicativeF f g) where
+instance (Plus f, Applicative f) ⇒ LiftAlt (Coproduct f g) where
+  liftAlt a b = Coproduct (Left (pure a <|> pure b))
+  empty' = Coproduct (Left empty)
+
+data HeadF f g a = Cis (f a) | Trans (g (FreeAT f g a))
+
+data ApplyF f g b a = ApplyF (HeadF f g a) (FreeAT f g (a → b))
+
+data FreeAT f g a = Pure a | Apply (Exists (ApplyF f g a))
+
+instance Functor (FreeAT f g) where
   map f (Pure a) = Pure (f a)
   map f (Apply ex) = Apply $ runExists' ex \(ApplyF x g) →
     mkExists do ApplyF x (map (_ >>> f) g)
 
-instance Applicative g ⇒ Apply (ApplicativeF f g) where
+instance Apply (FreeAT f g) where
   apply (Pure f) x = f <$> x
   apply f (Pure x) = (_ $ x) <$> f
   apply (Apply ex) y = Apply $ runExists' ex \(ApplyF x f) →
-    mkExists do ApplyF x (flip <$> f <*> FreeAT (pure y))
+    mkExists do ApplyF x (flip <$> f <*> y)
 
-instance Applicative g ⇒ Applicative (ApplicativeF f g) where
+instance Applicative (FreeAT f g) where
   pure = Pure
 
--- FreeAT instances
-instance Functor g ⇒ Functor (FreeAT f g) where
-  map f (FreeAT g) = FreeAT (map f <$> g)
+instance LiftAlt g ⇒ Alt (FreeAT f g) where
+  alt a b = wrap (liftAlt a b)
 
-instance Applicative g ⇒ Apply (FreeAT f g) where
-  apply (FreeAT f) (FreeAT x) = FreeAT (apply <$> f <*> x)
+instance LiftAlt g ⇒ Plus (FreeAT f g) where
+  empty = wrap empty'
 
-instance Applicative g ⇒ Applicative (FreeAT f g) where
-  pure = FreeAT <<< pure <<< Pure
+instance LiftAlt g ⇒ Alternative (FreeAT f g)
 
-instance Alt g ⇒ Alt (FreeAT f g) where
-  alt (FreeAT f) (FreeAT g) = FreeAT (alt f g)
+liftF ∷ ∀ f g. f ~> FreeAT f g
+liftF f = Apply $ mkExists $ ApplyF (Cis f) (Pure identity)
 
-instance Plus g ⇒ Plus (FreeAT f g) where
-  empty = FreeAT empty
-
-instance Alternative g ⇒ Alternative (FreeAT f g)
-
-liftF ∷ ∀ f g. Applicative g ⇒ f ~> FreeAT f g
-liftF f = FreeAT $ pure $ Apply $ mkExists $ ApplyF f (pure identity)
+wrap ∷ ∀ f g a. g (FreeAT f g a) → FreeAT f g a
+wrap g = Apply $ mkExists $ ApplyF (Trans g) (Pure identity)
 
 liftOuter ∷ ∀ f g. Functor g ⇒ g ~> FreeAT f g
-liftOuter f = FreeAT (Pure <$> f)
+liftOuter g = wrap (Pure <$> g)
 
 matchFree
   ∷ ∀ f g r
   . Functor g
   ⇒ (∀ x y. f x → r (x → y) → r y)
+  → (∀ x y. g (r x) → r (x → y) → r y)
   → (∀ x. x → r x)
-  → (∀ x. g (r x) → r x)
   → (FreeAT f g ~> r)
-matchFree apply' pure' natG (FreeAT ft) = natG $ ft <#> case _ of
-  Pure a → pure' a
-  Apply ex → runExists' ex \(ApplyF f fs) →
-    apply' f (matchFree apply' pure' natG fs)
+matchFree applyCis applyTrans pure' =
+  case _ of
+    Pure a → pure' a
+    Apply ex → runExists' ex \(ApplyF head tail) → case head of
+      (Cis f) → applyCis f (matchTail tail)
+      (Trans g) → applyTrans (matchTail <$> g) (matchTail tail)
+  where
+  matchTail ∷ (FreeAT f g ~> r)
+  matchTail f = matchFree applyCis applyTrans pure' f
 
 runFree
   ∷ ∀ f g h
@@ -76,7 +91,10 @@ runFree
   ⇒ (f ~> h)
   → (∀ x. g (h x) → h x)
   → (FreeAT f g ~> h)
-runFree natF = matchFree (\f g → (flip ($)) <$> natF f <*> g) pure
+runFree natF natG = matchFree
+  (\head tail → (#) <$> natF head <*> tail)
+  (\head tail → (#) <$> natG head <*> tail)
+  pure
 
 foldFree
   ∷ ∀ f g m a

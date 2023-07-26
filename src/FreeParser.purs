@@ -2,12 +2,10 @@ module FreeParser where
 
 import Prelude
 
-import Control.Alternative.Free (FreeAlt, liftF, matchFree)
-import Control.Applicative.Free.Trans (runExists')
-import Data.Const (Const(..))
+import Control.Alternative.Free (FreeAlt, liftF)
+import Control.Applicative.Free.Trans (ApplyF(..), FreeAT(..), HeadF(..), runExists')
 import Data.Exists (Exists, mkExists)
 import Data.Maybe (Maybe)
-import Data.Newtype (un)
 import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.Traversable (intercalate, traverse)
 import Leibniz (type (~))
@@ -62,13 +60,11 @@ manySpace = fromCharArray <$> many (satisfies $ TaggedFunction "space" isSpace)
   isSpace c = c == '\n' || c == '\r' || c == ' ' || c == '\t'
 
 printBnf ∷ ∀ char a. Parser char a → String
-printBnf = un Const <<< matchFree
-  ( \f fs → Const $ printSingle f <> case fs of
-      (Const "") → ""
-      (Const x) → ", " <> x
-  )
-  (\_ → Const "")
-  (intercalate (Const " | "))
+printBnf (Pure _) = ""
+printBnf (Apply ex) = intercalate ", " $ runExists' ex case _ of
+  ApplyF head tail → (_ <> [ printBnf tail ]) case head of
+    Cis f → [ printSingle f ]
+    Trans g → [ "(" <> intercalate " | " (printBnf <$> g) <> ")" ]
 
   where
   printSingle ∷ ∀ x. ParserF char x → String
@@ -76,7 +72,7 @@ printBnf = un Const <<< matchFree
   printSingle (Group parser) = "(" <> printBnf parser <> ")"
   printSingle (Eof _) = "EoF"
   printSingle (Satisfies (TaggedFunction str _) _) = "\"" <> str <> "\""
-  printSingle (Many ex) = runExists' ex \(ManyF parser _) →
+  printSingle (Many ex') = runExists' ex' \(ManyF parser _) →
     "{" <> printBnf parser <> "}"
-  printSingle (Option ex) = runExists' ex \(OptionF parser _) →
+  printSingle (Option ex') = runExists' ex' \(OptionF parser _) →
     "[" <> printBnf parser <> "]"

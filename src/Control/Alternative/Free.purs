@@ -12,26 +12,22 @@ import Control.Alternative (class Alternative)
 import Control.Alternative.Free.Trans (FreeAltT)
 import Control.Alternative.Free.Trans as Trans
 import Control.Applicative.Free.Trans (liftF) as Exports
-import Data.Identity (Identity(..))
+import Data.Const (Const(..))
 import Data.Newtype (un)
-import Safe.Coerce (coerce)
 
-type FreeAlt f = FreeAltT f Identity
+type FreeAlt f = FreeAltT f (Const Void)
 
 matchFree
   ∷ ∀ f r
   . (∀ x y. f x → r (x → y) → r y)
+  → (∀ x y. Array (r x) → r (x → y) → r y)
   → (∀ x. x → r x)
-  → (∀ x. Array (r x) → r x)
   → (FreeAlt f ~> r)
-matchFree apply' pure' natArray =
-  Trans.matchFree apply' pure' (natArray <<< coerceArray)
-  where
-  coerceArray ∷ ∀ x. Array (Identity x) → Array x
-  coerceArray = coerce
+matchFree applyCis applyTrans =
+  Trans.matchFree applyCis applyTrans (un Const >>> absurd)
 
 runFree ∷ ∀ f h. Alternative h ⇒ (f ~> h) → (FreeAlt f ~> h)
-runFree natF = Trans.runFree natF (un Identity)
+runFree natF = Trans.runFree natF (un Const >>> absurd)
 
 foldFree ∷ ∀ f m a. Monoid m ⇒ (∀ x. f x → m) → (FreeAlt f a → m)
-foldFree f = Trans.foldFree f (un Identity)
+foldFree f = Trans.foldFree f (un Const >>> absurd)
