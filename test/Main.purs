@@ -133,7 +133,7 @@ parser = ado
 
 main ∷ Effect Unit
 main = do
-  don't do
+  don't \_ → do
     log "Op:"
     log ("start 0: " <> show do runOp 0 action)
     log ("start 1: " <> show do runOp 1 action)
