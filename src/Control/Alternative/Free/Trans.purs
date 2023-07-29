@@ -1,7 +1,6 @@
 module Control.Alternative.Free.Trans
   ( FreeAltT
   , liftOuter
-  , matchFree
   , runFree
   , foldFree
 
@@ -22,19 +21,6 @@ type FreeAltT f g = FreeAT f (Coproduct Array g)
 
 liftOuter ∷ ∀ f g. Functor g ⇒ g ~> FreeAltT f g
 liftOuter f = Applicative.liftOuter (Coproduct (Right f))
-
-matchFree
-  ∷ ∀ f g r
-  . Functor g
-  ⇒ (∀ x y. f x → r (x → y) → r y)
-  → (∀ x y. Array (r x) → r (x → y) → r y)
-  → (∀ x y. g (r x) → r (x → y) → r y)
-  → (∀ x. x → r x)
-  → (FreeAltT f g ~> r)
-matchFree applyCis applyTransLeft applyTransRight =
-  Applicative.matchFree applyCis case _ of
-    Coproduct (Left array) → applyTransLeft array
-    Coproduct (Right g) → applyTransRight g
 
 runFree
   ∷ ∀ f g h

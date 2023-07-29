@@ -1,6 +1,5 @@
 module Control.Alternative.Free
   ( FreeAlt
-  , matchFree
   , runFree
   , foldFree
   , module Exports
@@ -16,15 +15,6 @@ import Data.Const (Const(..))
 import Data.Newtype (un)
 
 type FreeAlt f = FreeAltT f (Const Void)
-
-matchFree
-  ∷ ∀ f r
-  . (∀ x y. f x → r (x → y) → r y)
-  → (∀ x y. Array (r x) → r (x → y) → r y)
-  → (∀ x. x → r x)
-  → (FreeAlt f ~> r)
-matchFree applyCis applyTrans =
-  Trans.matchFree applyCis applyTrans (un Const >>> absurd)
 
 runFree ∷ ∀ f h. Alternative h ⇒ (f ~> h) → (FreeAlt f ~> h)
 runFree natF = Trans.runFree natF (un Const >>> absurd)

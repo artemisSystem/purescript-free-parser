@@ -67,23 +67,6 @@ wrap g = Apply $ mkExists $ ApplyF (Trans g) (Pure identity)
 liftOuter ∷ ∀ f g. Functor g ⇒ g ~> FreeAT f g
 liftOuter g = wrap (Pure <$> g)
 
-matchFree
-  ∷ ∀ f g r
-  . Functor g
-  ⇒ (∀ x y. f x → r (x → y) → r y)
-  → (∀ x y. g (r x) → r (x → y) → r y)
-  → (∀ x. x → r x)
-  → (FreeAT f g ~> r)
-matchFree applyCis applyTrans pure' =
-  case _ of
-    Pure a → pure' a
-    Apply ex → runExists' ex \(ApplyF head tail) → case head of
-      (Cis f) → applyCis f (matchTail tail)
-      (Trans g) → applyTrans (matchTail <$> g) (matchTail tail)
-  where
-  matchTail ∷ (FreeAT f g ~> r)
-  matchTail f = matchFree applyCis applyTrans pure' f
-
 runFree
   ∷ ∀ f g h
   . Functor g
@@ -91,10 +74,11 @@ runFree
   ⇒ (f ~> h)
   → (∀ x. g (h x) → h x)
   → (FreeAT f g ~> h)
-runFree natF natG = matchFree
-  (\head tail → (#) <$> natF head <*> tail)
-  (\head tail → (#) <$> natG head <*> tail)
-  pure
+runFree _ _ (Pure a) = pure a
+runFree natF natG (Apply ex) = runExists' ex case _ of
+  ApplyF head tail → (#)
+    <$> matchHead natF (map (runFree natF natG) >>> natG) head
+    <*> runFree natF natG tail
 
 foldFree
   ∷ ∀ f g m a
@@ -105,3 +89,8 @@ foldFree
   → (FreeAT f g a → m)
 foldFree fromF fromG = un Const <<<
   runFree (Const <<< fromF) (Const <<< fromG <<< map (un Const))
+
+matchHead ∷ ∀ f g a r. (f a → r) → (g (FreeAT f g a) → r) → HeadF f g a → r
+matchHead cis trans = case _ of
+  Cis f → cis f
+  Trans g → trans g

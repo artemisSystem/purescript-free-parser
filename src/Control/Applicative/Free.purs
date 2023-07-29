@@ -1,6 +1,5 @@
 module Control.Applicative.Free
   ( FreeA
-  , matchFree
   , runFree
   , foldFree
   , module Exports
@@ -15,16 +14,6 @@ import Data.Const (Const(..))
 import Data.Newtype (un)
 
 type FreeA f = FreeAT f (Const Void)
-
-matchFree
-  ∷ ∀ f r
-  . (∀ x y. f x → r (x → y) → r y)
-  → (∀ x. x → r x)
-  → (FreeA f ~> r)
-matchFree applyCis pure' = Trans.matchFree
-  applyCis
-  (un Const >>> absurd)
-  pure'
 
 runFree ∷ ∀ f h. Applicative h ⇒ (f ~> h) → (FreeA f ~> h)
 runFree natF = Trans.runFree natF (un Const >>> absurd)
