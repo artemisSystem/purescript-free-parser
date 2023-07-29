@@ -3,7 +3,7 @@ module FreeParser where
 import Prelude
 
 import Control.Alternative.Free (FreeAlt, liftF)
-import Control.Applicative.Free.Trans (ApplyF(..), FreeAT(..), HeadF(..), runExists')
+import Control.Applicative.Free.Trans (ApplyF(..), FreeAT(..), HeadF(..), matchHead, runExists')
 import Data.Exists (Exists, mkExists)
 import Data.Maybe (Maybe)
 import Data.String.CodeUnits (fromCharArray, toCharArray)
@@ -60,13 +60,15 @@ manySpace = fromCharArray <$> many (satisfies $ TaggedFunction "space" isSpace)
   isSpace c = c == '\n' || c == '\r' || c == ' ' || c == '\t'
 
 printBnf ∷ ∀ char a. Parser char a → String
-printBnf (Pure _) = ""
-printBnf (Apply ex) = intercalate ", " $ runExists' ex case _ of
-  ApplyF head tail → (_ <> [ printBnf tail ]) case head of
-    Cis f → [ printSingle f ]
-    Trans g → [ "(" <> intercalate " | " (printBnf <$> g) <> ")" ]
-
+printBnf = intercalate ", " <<< printSegments
   where
+  printSegments ∷ ∀ x. Parser char x → Array String
+  printSegments (Pure _) = []
+  printSegments (Apply ex) = runExists' ex case _ of
+    ApplyF head tail → (_ <> printSegments tail) case head of
+      Cis f → [ printSingle f ]
+      Trans g → [ "(" <> intercalate " | " (printBnf <$> g) <> ")" ]
+
   printSingle ∷ ∀ x. ParserF char x → String
   printSingle (Label str _) = str
   printSingle (Group parser) = "(" <> printBnf parser <> ")"
