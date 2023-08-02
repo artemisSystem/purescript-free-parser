@@ -18,7 +18,8 @@ import Data.Tuple (Tuple)
 import Data.Unfoldable1 (singleton)
 import Effect (Effect)
 import Effect.Console (log)
-import FreeParser (Parser, literal, many, manySpace, printBnf, string)
+import FreeParser (Parser, literal, many, manySpace, string)
+import FreeParser.BnfStmt (printBnfStmt, toBnfStmt)
 import Safe.Coerce (coerce)
 
 data OpF a = Add Int a | Mul Int a | Get (Int → a)
@@ -148,7 +149,10 @@ main = do
     log ("start 0: " <> show do runOpAlt 0 actionAlt)
     log ("start 1: " <> show do runOpAlt 1 actionAlt)
 
-  log ("parser = " <> printBnf parser <> ";")
+  let bnf = toBnfStmt parser
+  log "\n"
+  -- log (show bnf)
+  log ("parser = " <> printBnfStmt bnf <> ";")
 
   where
   don't _ = pure unit
