@@ -103,3 +103,11 @@ matchHead ∷ ∀ f g a r. (f a → r) → (g (FreeAT f g a) → r) → HeadF f 
 matchHead cis trans = case _ of
   Cis f → cis f
   Trans g → trans g
+
+hoistFree ∷ ∀ f f' g. Functor g ⇒ (f ~> f') → (FreeAT f g ~> FreeAT f' g)
+hoistFree _ (Pure a) = Pure a
+hoistFree nat (Apply ex) = runExists' ex case _ of
+  ApplyF head tail → Apply $ mkExists $
+    (\h → ApplyF h $ hoistFree nat tail) case head of
+      Cis f → Cis (nat f)
+      Trans g → Trans (hoistFree nat <$> g)
