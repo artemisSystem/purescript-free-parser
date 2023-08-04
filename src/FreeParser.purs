@@ -4,9 +4,10 @@ import Prelude
 
 import Control.Alternative.Free (liftF)
 import Control.Applicative.Free.Trans (class LiftAlt, FreeAT, wrap)
+import Data.CodePoint.Unicode (isSpace)
 import Data.Exists (Exists, mkExists)
 import Data.Maybe (Maybe)
-import Data.String.CodeUnits (fromCharArray, singleton, toCharArray)
+import Data.String.CodePoints (CodePoint, fromCodePointArray, singleton, toCodePointArray)
 import Data.Traversable (traverse)
 import Leibniz (type (~))
 
@@ -58,13 +59,12 @@ many parser = liftF $ Many $ mkExists (ManyF parser identity)
 option ∷ ∀ char a. Parser char a → Parser char (Maybe a)
 option parser = liftF $ Option $ mkExists (OptionF parser identity)
 
-literal ∷ Char → Parser Char Char
+literal ∷ CodePoint → Parser CodePoint CodePoint
 literal char = satisfies (TaggedFunction (singleton char) (_ == char))
 
-string ∷ String → Parser Char String
-string = toCharArray >>> traverse literal >>> map fromCharArray
+string ∷ String → Parser CodePoint String
+string = toCodePointArray >>> traverse literal >>> map fromCodePointArray
 
-manySpace ∷ Parser Char String
-manySpace = fromCharArray <$> many (satisfies $ TaggedFunction "space" isSpace)
-  where
-  isSpace c = c == '\n' || c == '\r' || c == ' ' || c == '\t'
+manySpace ∷ Parser CodePoint String
+manySpace = fromCodePointArray <$> many
+  (satisfies $ TaggedFunction "space" isSpace)

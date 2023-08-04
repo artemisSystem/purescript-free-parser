@@ -14,6 +14,7 @@ import Data.Functor.Compose (Compose(..))
 import Data.Monoid.Additive (Additive(..))
 import Data.Monoid.Multiplicative (Multiplicative(..))
 import Data.Newtype (un)
+import Data.String (CodePoint, codePointFromChar)
 import Data.Tuple (Tuple)
 import Data.Unfoldable1 (singleton)
 import Effect (Effect)
@@ -124,12 +125,12 @@ actionArray = ado
   liftF [ unit, unit ]
   in unit
 
-parser ∷ Parser Char { a ∷ String, b ∷ Int }
+parser ∷ Parser CodePoint { a ∷ String, b ∷ Int }
 parser = ado
   manySpace
   str ← string "abc" <|> string "123" <|> string "abcd"
   manySpace
-  int ← sum <$> many (literal '1' $> 1)
+  int ← sum <$> many (literal (codePointFromChar '1') $> 1)
   in { a: str, b: int }
 
 main ∷ Effect Unit
