@@ -7,12 +7,13 @@ import Control.Monad.State (State, execState)
 import Control.Monad.State as State
 import Data.Const (Const(..))
 import Data.Foldable (intercalate)
-import Data.FoldableWithIndex (foldMapWithIndex)
+import Data.Foldable as Foldable
 import Data.Functor.Compose (Compose(..))
 import Data.Generic.Rep (class Generic)
-import Data.Map (Map)
-import Data.Map as Map
+import Data.List (List(..), reverse, (:))
+import Data.Maybe (isJust)
 import Data.Show.Generic (genericShow)
+import Data.Tuple (Tuple(..), fst)
 import FreeParser (ManyF(..), OptionF(..), Parser, ParserBase(..), ParserControl(..), TaggedFunction(..))
 
 data BnfStmt
@@ -66,19 +67,26 @@ toBnfStmt = foldFree base control
 
 type ConstState ∷ ∀ k. Type → k → Type
 type ConstState char = Compose
-  (State (Map String (Parser char Unit)))
+  (State (List (Tuple String (Parser char Unit))))
   (Const Unit)
 
-lift ∷ ∀ char x. State (Map String (Parser char Unit)) Unit → ConstState char x
+lift
+  ∷ ∀ char x
+  . State (List (Tuple String (Parser char Unit))) Unit
+  → ConstState char x
 lift s = Compose (s $> Const unit)
 
-lower ∷ ∀ char x. ConstState char x → State (Map String (Parser char Unit)) Unit
+lower
+  ∷ ∀ char x
+  . ConstState char x
+  → State (List (Tuple String (Parser char Unit))) Unit
 lower (Compose s) = void s
 
-findLabels ∷ ∀ char a. Parser char a → Map String (Parser char Unit)
-findLabels p = execState (find p) Map.empty
+findLabels ∷ ∀ char a. Parser char a → List (Tuple String (Parser char Unit))
+findLabels p = execState (find p) Nil
   where
-  find ∷ ∀ x. Parser char x → State (Map String (Parser char Unit)) Unit
+  find
+    ∷ ∀ x. Parser char x → State (List (Tuple String (Parser char Unit))) Unit
   find parser = lower (runFree' base control parser)
 
   base ∷ ParserBase char ~> ConstState char
@@ -91,13 +99,16 @@ findLabels p = execState (find p) Map.empty
   control (Alt a b) = lift (find a) *> lift (find b)
   control Empty = lift (pure unit)
   control (Label label parser) = lift $
-    unlessM (State.gets (Map.member label)) do
-      State.modify_ (Map.insert label (void parser))
+    unlessM (State.gets (contains label)) do
+      State.modify_ (Tuple label (void parser) : _)
       find parser
 
-printLabelMap ∷ Map String BnfStmt → String
-printLabelMap = intercalate "\n" <<< foldMapWithIndex \label bnf →
-  [ label <> " = " <> printBnfStmt bnf <> ";\n" ]
+  contains ∷ String → List (Tuple String (Parser char Unit)) → Boolean
+  contains str = Foldable.find (fst >>> eq str) >>> isJust
+
+printLabelMap ∷ List (Tuple String BnfStmt) → String
+printLabelMap = intercalate "\n" <<< map \(Tuple label bnf) →
+  label <> " = " <> printBnfStmt bnf <> ";\n"
 
 printBnf ∷ ∀ char a. Parser char a → String
-printBnf = findLabels >>> map toBnfStmt >>> printLabelMap
+printBnf = findLabels >>> map (map toBnfStmt) >>> reverse >>> printLabelMap
