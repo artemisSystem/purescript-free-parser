@@ -48,8 +48,8 @@ toBnfStmt = foldFree base control
   base (Eof _) = BnfLiteral "EoF"
   base (Satisfies (TaggedFunction tag _) _) = BnfLiteral tag
   base (Many ex) = runExists' ex \(ManyF parser _) → BnfMany (toBnfStmt parser)
-  base (Option ex) = runExists' ex \(OptionF parser _) → BnfOption
-    (toBnfStmt parser)
+  base (Option ex) = runExists' ex \(OptionF parser _) →
+    BnfOption (toBnfStmt parser)
 
   control ∷ ParserControl BnfStmt → BnfStmt
   control (Label str _) = BnfReference str
