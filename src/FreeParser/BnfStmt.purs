@@ -20,6 +20,7 @@ import FreeParser (ManyF(..), OptionF(..), Parser, ParserBase(..), ParserControl
 data BnfStmt
   = ConcatBnf (Array BnfStmt)
   | AltBnf BnfStmt BnfStmt
+  | BnfEmpty
   | BnfMany BnfStmt
   | BnfOption BnfStmt
   | BnfParens BnfStmt
@@ -44,6 +45,7 @@ printBnfStmt ∷ BnfStmt → String
 printBnfStmt (ConcatBnf stmts) = intercalate ", " (printBnfStmt <$> stmts)
 printBnfStmt (AltBnf a b) =
   "(" <> printBnfStmt a <> " | " <> printBnfStmt b <> ")"
+printBnfStmt BnfEmpty = "empty"
 printBnfStmt (BnfMany stmt) = "{" <> printBnfStmt stmt <> "}"
 printBnfStmt (BnfOption stmt) = "[" <> printBnfStmt stmt <> "]"
 printBnfStmt (BnfParens stmt) = "(" <> printBnfStmt stmt <> ")"
@@ -64,7 +66,7 @@ toBnfStmt = foldFree base control
   control (Label str _) = BnfReference str
   control (Group stmt) = BnfParens stmt
   control (Alt a b) = AltBnf a b
-  control Empty = mempty
+  control Empty = BnfEmpty
 
 type ConstState ∷ ∀ k. Type → k → Type
 type ConstState char = Compose
