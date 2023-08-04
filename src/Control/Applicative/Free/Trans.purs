@@ -67,6 +67,19 @@ wrap g = Apply $ mkExists $ ApplyF (Trans g) (Pure identity)
 liftOuter ∷ ∀ f g. Functor g ⇒ g ~> FreeAT f g
 liftOuter g = wrap (Pure <$> g)
 
+runFree'
+  ∷ ∀ f g h
+  . Functor g
+  ⇒ Applicative h
+  ⇒ (f ~> h)
+  → (∀ x. g (FreeAT f g x) → h x)
+  → (FreeAT f g ~> h)
+runFree' _ _ (Pure a) = pure a
+runFree' natF natG (Apply ex) = runExists' ex case _ of
+  ApplyF head tail → (#)
+    <$> matchHead natF natG head
+    <*> runFree' natF natG tail
+
 runFree
   ∷ ∀ f g h
   . Functor g
@@ -74,11 +87,7 @@ runFree
   ⇒ (f ~> h)
   → (∀ x. g (h x) → h x)
   → (FreeAT f g ~> h)
-runFree _ _ (Pure a) = pure a
-runFree natF natG (Apply ex) = runExists' ex case _ of
-  ApplyF head tail → (#)
-    <$> matchHead natF (map (runFree natF natG) >>> natG) head
-    <*> runFree natF natG tail
+runFree natF natG = runFree' natF (map (\f → runFree natF natG f) >>> natG)
 
 foldFree
   ∷ ∀ f g m a

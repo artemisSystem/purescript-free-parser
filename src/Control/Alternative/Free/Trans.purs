@@ -14,13 +14,24 @@ import Control.Applicative.Free.Trans (FreeAT)
 import Control.Applicative.Free.Trans (liftF) as Exports
 import Control.Applicative.Free.Trans as Applicative
 import Data.Either (Either(..))
-import Data.Foldable (fold, oneOf)
+import Data.Foldable (fold, oneOf, oneOfMap)
 import Data.Functor.Coproduct (Coproduct(..))
 
 type FreeAltT f g = FreeAT f (Coproduct Array g)
 
 liftOuter ∷ ∀ f g. Functor g ⇒ g ~> FreeAltT f g
 liftOuter f = Applicative.liftOuter (Coproduct (Right f))
+
+runFree'
+  ∷ ∀ f g h
+  . Functor g
+  ⇒ Alternative h
+  ⇒ (f ~> h)
+  → (∀ x. g (FreeAltT f g x) → h x)
+  → (FreeAltT f g ~> h)
+runFree' natF natG = Applicative.runFree' natF case _ of
+  Coproduct (Left array) → oneOfMap (runFree' natF natG) array
+  Coproduct (Right g) → natG g
 
 runFree
   ∷ ∀ f g h
