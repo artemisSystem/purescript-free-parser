@@ -18,9 +18,10 @@ import Data.String (CodePoint, codePointFromChar)
 import Data.Tuple (Tuple)
 import Data.Unfoldable1 (singleton)
 import Effect (Effect)
-import Effect.Console (log)
+import Effect.Console (log, logShow)
 import FreeParser (Parser, literal, many, manySpace, string)
 import FreeParser.BnfStmt (printBnfStmt, toBnfStmt)
+import FreeParser.SimpleRunner (SimpleRunner(..), parseString)
 import Safe.Coerce (coerce)
 
 data OpF a = Add Int a | Mul Int a | Get (Int → a)
@@ -152,8 +153,10 @@ main = do
 
   let bnf = toBnfStmt parser
   log "\n"
-  -- log (show bnf)
   log ("parser = " <> printBnfStmt bnf <> ";")
-
+  let str = "  1231111"
+  log ("string: " <> str)
+  case parseString parser of
+    SimpleRunner f → logShow (f str)
   where
   don't _ = pure unit
