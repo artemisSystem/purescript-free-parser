@@ -14,7 +14,7 @@ import Data.List (List(..), reverse, (:))
 import Data.Maybe (isJust)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..), fst)
-import FreeParser (ManyF(..), OptionF(..), Parser, ParserBase(..), ParserControl(..), TaggedFunction(..))
+import FreeParser (ManyF(..), OptionF(..), Parser, ParserBase(..), ParserControl(..))
 
 data BnfStmt
   = ConcatBnf (Array BnfStmt)
@@ -54,7 +54,7 @@ toBnfStmt = foldFree base control
   where
   base ∷ ∀ x. ParserBase char x → BnfStmt
   base (Eof _) = BnfLiteral "EoF"
-  base (Satisfies (TaggedFunction tag _) _) = BnfLiteral tag
+  base (Satisfies tag _ _) = BnfLiteral tag
   base (Many ex) = runExists' ex \(ManyF parser _) → BnfMany (toBnfStmt parser)
   base (Option ex) = runExists' ex \(OptionF parser _) →
     BnfOption (toBnfStmt parser)

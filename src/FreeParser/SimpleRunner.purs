@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..))
 import Data.String (CodePoint)
 import Data.String.CodePoints (singleton, uncons)
 import Data.Tuple (Tuple(..))
-import FreeParser (ManyF(..), OptionF(..), Parser, ParserBase(..), ParserControl(..), TaggedFunction(..))
+import FreeParser (ManyF(..), OptionF(..), Parser, ParserBase(..), ParserControl(..))
 import Leibniz (coerce')
 
 newtype SimpleRunner str err a = SimpleRunner (str → Either err (Tuple str a))
@@ -44,7 +44,7 @@ parseString ∷ Parser CodePoint ~> SimpleRunner String String
 parseString = runFree base control
   where
   base ∷ ParserBase CodePoint ~> SimpleRunner String String
-  base (Satisfies (TaggedFunction tag pred) proof) = SimpleRunner \str →
+  base (Satisfies tag pred proof) = SimpleRunner \str →
     case uncons str of
       Just { head, tail } →
         if pred head then Right $ Tuple tail (coerce' proof head)
