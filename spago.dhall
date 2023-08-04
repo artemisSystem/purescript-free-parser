@@ -24,6 +24,7 @@ to generate this file without the comments in this block.
   , "identity"
   , "maybe"
   , "newtype"
+  , "ordered-collections"
   , "prelude"
   , "qualified-do"
   , "safe-coerce"

@@ -18,10 +18,9 @@ import Data.String (CodePoint, codePointFromChar)
 import Data.Tuple (Tuple)
 import Data.Unfoldable1 (singleton)
 import Effect (Effect)
-import Effect.Console (log, logShow)
-import FreeParser (Parser, literal, many, manySpace, string)
-import FreeParser.BnfStmt (printBnfStmt, toBnfStmt)
-import FreeParser.SimpleRunner (SimpleRunner(..), parseString)
+import Effect.Console (log)
+import FreeParser (Parser, label, literal, many, manySpace, string)
+import FreeParser.BnfStmt (printBnf)
 import Safe.Coerce (coerce)
 
 data OpF a = Add Int a | Mul Int a | Get (Int → a)
@@ -127,11 +126,11 @@ actionArray = ado
   in unit
 
 parser ∷ Parser CodePoint { a ∷ String, b ∷ Int }
-parser = ado
+parser = label "parser" ado
   manySpace
-  str ← string "abc" <|> string "123" <|> string "abcd"
+  str ← label "strings" $ string "abc" <|> string "123" <|> string "abcd"
   manySpace
-  int ← sum <$> many (literal (codePointFromChar '1') $> 1)
+  int ← label "ones" $ sum <$> many (literal (codePointFromChar '1') $> 1)
   in { a: str, b: int }
 
 main ∷ Effect Unit
@@ -151,12 +150,6 @@ main = do
     log ("start 0: " <> show do runOpAlt 0 actionAlt)
     log ("start 1: " <> show do runOpAlt 1 actionAlt)
 
-  let bnf = toBnfStmt parser
-  log "\n"
-  log ("parser = " <> printBnfStmt bnf <> ";")
-  let str = "  1231111"
-  log ("string: " <> str)
-  case parseString parser of
-    SimpleRunner f → logShow (f str)
+  log (printBnf parser)
   where
   don't _ = pure unit
