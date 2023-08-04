@@ -45,15 +45,15 @@ parseString ∷ Parser CodePoint ~> SimpleRunner String String
 parseString = runFree base control
   where
   base ∷ ParserBase CodePoint ~> SimpleRunner String String
-  base (Satisfies tag pred proof) = SimpleRunner \str →
+  base (Parse tag f) = SimpleRunner \str →
     case uncons str of
-      Just { head, tail } →
-        if pred head then Right $ Tuple tail (coerce' proof head)
-        else Left $ "Expected " <> tag <> " but got " <> singleton head
+      Just { head, tail } → case f head of
+        Just a → Right (Tuple tail a)
+        Nothing → Left $ "Expected " <> tag <> " but got " <> singleton head
       Nothing → Left $ "Expected " <> tag <> " but got end of file"
-  base (Eof proof) = SimpleRunner \str → case uncons str of
+  base (Eof a) = SimpleRunner \str → case uncons str of
     Just { head } → Left $ "Expected end of file but got " <> singleton head
-    Nothing → Right $ Tuple "" (coerce' proof unit)
+    Nothing → Right (Tuple "" a)
   base (Many ex) = runExists' ex \(ManyF parser proof) → coerce' proof <$>
     Array.many (parseString parser)
   base (Option ex) = runExists' ex \(OptionF parser proof) → coerce' proof <$>

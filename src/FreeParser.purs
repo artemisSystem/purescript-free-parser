@@ -7,7 +7,7 @@ import Control.Applicative.Free.Trans (class LiftAlt, FreeAT, wrap)
 import Data.CodePoint.Unicode (isSpace)
 import Data.Exists (Exists, mkExists)
 import Data.Lazy (Lazy, defer)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.String.CodePoints (CodePoint, fromCodePointArray, singleton, toCodePointArray)
 import Data.Traversable (traverse)
 import Leibniz (type (~))
@@ -28,8 +28,8 @@ data ManyF char a b = ManyF (Parser char b) (a ~ Array b)
 data OptionF char a b = OptionF (Parser char b) (a ~ Maybe b)
 
 data ParserBase char a
-  = Eof (a ~ Unit)
-  | Satisfies String (char → Boolean) (a ~ char)
+  = Eof a
+  | Parse String (char → Maybe a)
   | Many (Exists (ManyF char a))
   | Option (Exists (OptionF char a))
 
@@ -42,10 +42,13 @@ group ∷ ∀ char a. Parser char a → Parser char a
 group parser = wrap (Group parser)
 
 eof ∷ ∀ char. Parser char Unit
-eof = liftF (Eof identity)
+eof = liftF (Eof unit)
+
+parse ∷ ∀ char a. String → (char → Maybe a) → Parser char a
+parse tag f = liftF (Parse tag f)
 
 satisfies ∷ ∀ char. String → (char → Boolean) → Parser char char
-satisfies tag pred = liftF (Satisfies tag pred identity)
+satisfies tag pred = parse tag \char → if pred char then Just char else Nothing
 
 many ∷ ∀ char a. Parser char a → Parser char (Array a)
 many parser = liftF $ Many $ mkExists (ManyF parser identity)

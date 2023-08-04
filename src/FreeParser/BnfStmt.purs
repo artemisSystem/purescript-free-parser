@@ -55,7 +55,7 @@ toBnfStmt = foldFree base control
   where
   base ∷ ∀ x. ParserBase char x → BnfStmt
   base (Eof _) = BnfLiteral "EoF"
-  base (Satisfies tag _ _) = BnfLiteral tag
+  base (Parse tag _) = BnfLiteral tag
   base (Many ex) = runExists' ex \(ManyF parser _) → BnfMany (toBnfStmt parser)
   base (Option ex) = runExists' ex \(OptionF parser _) →
     BnfOption (toBnfStmt parser)
