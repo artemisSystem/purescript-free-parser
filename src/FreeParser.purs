@@ -6,13 +6,14 @@ import Control.Alternative.Free (liftF)
 import Control.Applicative.Free.Trans (class LiftAlt, FreeAT, wrap)
 import Data.CodePoint.Unicode (isSpace)
 import Data.Exists (Exists, mkExists)
+import Data.Lazy (Lazy, defer)
 import Data.Maybe (Maybe)
 import Data.String.CodePoints (CodePoint, fromCodePointArray, singleton, toCodePointArray)
 import Data.Traversable (traverse)
 import Leibniz (type (~))
 
 data ParserControl a
-  = Label String a
+  = Label String (Lazy a)
   | Group a
   | Empty
   | Alt a a
@@ -34,8 +35,8 @@ data ParserBase char a
 
 type Parser char = FreeAT (ParserBase char) ParserControl
 
-label ∷ ∀ char a. String → Parser char a → Parser char a
-label str parser = wrap (Label str parser)
+label ∷ ∀ char a. String → (Unit → Parser char a) → Parser char a
+label str parser = wrap (Label str (defer parser))
 
 group ∷ ∀ char a. Parser char a → Parser char a
 group parser = wrap (Group parser)

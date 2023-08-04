@@ -22,6 +22,7 @@ to generate this file without the comments in this block.
   , "foldable-traversable"
   , "functors"
   , "identity"
+  , "lazy"
   , "lists"
   , "maybe"
   , "newtype"

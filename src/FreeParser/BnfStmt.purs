@@ -10,6 +10,7 @@ import Data.Foldable (intercalate)
 import Data.Foldable as Foldable
 import Data.Functor.Compose (Compose(..))
 import Data.Generic.Rep (class Generic)
+import Data.Lazy (force)
 import Data.List (List(..), reverse, (:))
 import Data.Maybe (isJust)
 import Data.Show.Generic (genericShow)
@@ -98,8 +99,9 @@ findLabels p = execState (find p) Nil
   control (Group parser) = lift (find parser)
   control (Alt a b) = lift (find a) *> lift (find b)
   control Empty = lift (pure unit)
-  control (Label label parser) = lift $
+  control (Label label parserL) = lift $
     unlessM (State.gets (contains label)) do
+      let parser = force parserL
       State.modify_ (Tuple label (void parser) : _)
       find parser
 

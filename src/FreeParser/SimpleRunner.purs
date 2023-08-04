@@ -9,6 +9,7 @@ import Control.Lazy (class Lazy)
 import Control.Plus (class Plus)
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Lazy (force)
 import Data.Maybe (Maybe(..))
 import Data.String (CodePoint)
 import Data.String.CodePoints (singleton, uncons)
@@ -62,7 +63,7 @@ parseString = runFree base control
     ∷ ∀ a
     . ParserControl (SimpleRunner String String a)
     → SimpleRunner String String a
-  control (Label _ parser) = parser
+  control (Label _ parser) = force parser
   control (Group parser) = parser
   control Empty = empty
   control (Alt a b) = a <|> b

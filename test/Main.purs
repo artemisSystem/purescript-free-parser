@@ -126,11 +126,11 @@ actionArray = ado
   in unit
 
 parser ∷ Parser CodePoint { a ∷ String, b ∷ Int }
-parser = label "parser" ado
+parser = label "parser" \_ → ado
   manySpace
-  str ← label "strings" $ string "abc" <|> string "123" <|> string "abcd"
+  str ← label "strings" \_ → string "abc" <|> string "123" <|> string "abcd"
   manySpace
-  int ← label "ones" $ sum <$> many (literal (codePointFromChar '1') $> 1)
+  int ← label "ones" \_ → sum <$> many (literal (codePointFromChar '1') $> 1)
   in { a: str, b: int }
 
 main ∷ Effect Unit
