@@ -53,6 +53,9 @@ satisfies tag pred = parse tag \char → if pred char then Just char else Nothin
 many ∷ ∀ char a. Parser char a → Parser char (Array a)
 many parser = liftF $ Many $ mkExists (ManyF parser identity)
 
+manyChar ∷ ∀ char. Parser char CodePoint → Parser char String
+manyChar parser = fromCodePointArray <$> many parser
+
 option ∷ ∀ char a. Parser char a → Parser char (Maybe a)
 option parser = liftF $ Option $ mkExists (OptionF parser identity)
 
@@ -63,4 +66,4 @@ string ∷ String → Parser CodePoint String
 string = toCodePointArray >>> traverse literal >>> map fromCodePointArray
 
 manySpace ∷ Parser CodePoint String
-manySpace = fromCodePointArray <$> many (satisfies "space" isSpace)
+manySpace = manyChar (satisfies "space" isSpace)
