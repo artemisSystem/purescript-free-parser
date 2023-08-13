@@ -5,6 +5,7 @@ import Prelude
 import Control.Apply (lift2)
 import Control.Lazy (class Lazy, defer)
 import Data.Either (Either(..), note)
+import Data.Identity (Identity)
 import Data.Maybe (Maybe)
 import Effect (Effect)
 import Effect.Aff (Aff)
@@ -25,6 +26,9 @@ instance Select Effect where
   select = selectM
 
 instance Select Aff where
+  select = selectM
+
+instance Select Identity where
   select = selectM
 
 infixl 4 select as <*?

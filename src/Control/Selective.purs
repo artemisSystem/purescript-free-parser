@@ -5,13 +5,19 @@ import Prelude
 import Control.Select (class Select, ifS)
 import Data.Either (Either)
 import Data.Foldable (class Foldable, foldr)
+import Data.Identity (Identity)
 import Data.Maybe (Maybe)
+import Effect (Effect)
+import Effect.Aff (Aff)
 
 class (Applicative f, Select f) ⇐ Selective f
 
 instance Selective Array
 instance Selective Maybe
 instance Selective (Either e)
+instance Selective Effect
+instance Selective Aff
+instance Selective Identity
 
 orS ∷ ∀ f. Selective f ⇒ f Boolean → f Boolean → f Boolean
 orS x y = ifS x (pure true) y
