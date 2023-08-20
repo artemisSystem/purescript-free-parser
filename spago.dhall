@@ -27,14 +27,17 @@ to generate this file without the comments in this block.
   , "lists"
   , "maybe"
   , "newtype"
+  , "partial"
   , "prelude"
   , "qualified-do"
   , "safe-coerce"
   , "strings"
   , "transformers"
   , "tuples"
+  , "typelevel-prelude"
   , "unfoldable"
   , "unicode"
+  , "unsafe-coerce"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
