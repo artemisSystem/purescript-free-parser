@@ -2,6 +2,7 @@ module Control.Selective where
 
 import Prelude
 
+import Control.Monad.ST (ST)
 import Control.Select (class Select, ifS)
 import Data.Either (Either)
 import Data.Foldable (class Foldable, foldr)
@@ -18,6 +19,7 @@ instance Selective (Either e)
 instance Selective Effect
 instance Selective Aff
 instance Selective Identity
+instance Selective (ST h)
 
 orS ∷ ∀ f. Selective f ⇒ f Boolean → f Boolean → f Boolean
 orS x y = ifS x (pure true) y

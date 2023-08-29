@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Apply (lift2)
 import Control.Lazy (class Lazy, defer)
+import Control.Monad.ST (ST)
 import Data.Either (Either(..), note)
 import Data.Identity (Identity)
 import Data.Maybe (Maybe)
@@ -29,6 +30,9 @@ instance Select Aff where
   select = selectM
 
 instance Select Identity where
+  select = selectM
+
+instance Select (ST h) where
   select = selectM
 
 infixl 4 select as <*?
