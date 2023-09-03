@@ -35,54 +35,59 @@ type FreeVRep f rec a =
   }
 
 inj
-  ∷ ∀ @sym f rx r a
+  ∷ ∀ @sym f rx r1 r2 a
   . Reflectable sym String
-  ⇒ Row.Cons sym f rx r
-  ⇒ f (FreeV r) a
-  → FreeV r a
+  ⇒ Row.Cons sym f rx r1
+  ⇒ f (FreeV r2) a
+  → FreeV' r1 r2 a
 inj value = coerceV { type: reflectType @sym Proxy, value }
   where
-  coerceV ∷ FreeVRep f (FreeV r) a → FreeV r a
+  coerceV ∷ FreeVRep f (FreeV r2) a → FreeV' r1 r2 a
   coerceV = unsafeCoerce
 
 prj
-  ∷ ∀ @sym f rx r a
+  ∷ ∀ @sym f rx r1 r2 a
   . Reflectable sym String
-  ⇒ Row.Cons sym f rx r
-  ⇒ FreeV r a
-  → Maybe (f (FreeV r) a)
+  ⇒ Row.Cons sym f rx r1
+  ⇒ FreeV' r1 r2 a
+  → Maybe (f (FreeV r2) a)
 prj = on @sym Just \_ → Nothing
 
 on
-  ∷ ∀ @sym f a b rx r
-  . Row.Cons sym f rx r
+  ∷ ∀ @sym f a b rx row innerRow
+  . Row.Cons sym f rx row
   ⇒ Reflectable sym String
-  ⇒ (f (FreeV r) a → b)
-  → (FreeV rx a → b)
-  → FreeV r a
+  ⇒ (f (FreeV innerRow) a → b)
+  → (FreeV' rx innerRow a → b)
+  → FreeV' row innerRow a
   → b
 on matching other variant = case coerceV variant of
   { type: t, value } →
     if t == reflectType @sym Proxy then matching value
     else other (reduce variant)
   where
-  coerceV ∷ FreeV r a → FreeVRep f (FreeV r) a
+  coerceV ∷ FreeV' row innerRow a → FreeVRep f (FreeV innerRow) a
   coerceV = unsafeCoerce
 
-  reduce ∷ FreeV r a → FreeV rx a
+  reduce ∷ FreeV' row innerRow a → FreeV' rx innerRow a
   reduce = unsafeCoerce
 
-case_ ∷ ∀ a b. FreeV () a → b
+case_ ∷ ∀ a b r. FreeV' () r a → b
 case_ variant = unsafeCrashWith $
-  "FreeV: pattern match failure on " <> (coerceV variant).type
+  "FreeV: pattern match failure on " <> (absurd variant).type
   where
-  coerceV ∷ ∀ f. FreeV () a → FreeVRep f (FreeV ()) a
-  coerceV = unsafeCoerce
+  absurd ∷ ∀ f. FreeV' () r a → FreeVRep f (FreeV r) a
+  absurd = unsafeCoerce
 
-default ∷ ∀ r a b. a → FreeV r b → a
+default ∷ ∀ r1 r2 a b. a → FreeV' r1 r2 b → a
 default a _ = a
 
-expand ∷ ∀ lt mix gt a. Row.Union lt mix gt ⇒ FreeV lt a → FreeV gt a
+expand
+  ∷ ∀ lt1 mix1 gt1 lt2 mix2 gt2 a
+  . Row.Union lt1 mix1 gt1
+  ⇒ Row.Union lt2 mix2 gt2
+  ⇒ FreeV' lt1 lt2 a
+  → FreeV' gt1 gt2 a
 expand = unsafeCoerce
 
 newtype ToNatF ∷ ∀ k1 k2. (k1 → k1 → k2 → Type) → k1 → k1 → Type
