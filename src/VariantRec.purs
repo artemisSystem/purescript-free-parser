@@ -65,9 +65,5 @@ case_ variant = unsafeCrashWith $
 default ∷ ∀ r a b. a → VariantRec r b → a
 default a _ = a
 
-expand
-  ∷ ∀ lt mix gt a
-  . Row.Union lt mix gt
-  ⇒ VariantRec lt a
-  → VariantRec gt a
+expand ∷ ∀ lt mix gt a. Row.Union lt mix gt ⇒ VariantRec lt a → VariantRec gt a
 expand = unsafeCoerce
