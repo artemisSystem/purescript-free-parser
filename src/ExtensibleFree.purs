@@ -2,11 +2,11 @@ module ExtensibleFree where
 
 import Prelude
 
-import Control.Alt (class Alt)
+import Control.Alt (class Alt, (<|>))
 import Control.Alternative (class Alternative)
 import Control.MonadPlus (class MonadPlus)
-import Control.Plus (class Plus)
-import Control.Select (class Select)
+import Control.Plus (class Plus, empty)
+import Control.Select (class Select, (<*?))
 import Control.Selective (class Selective)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
@@ -118,6 +118,22 @@ liftAt = inj @sym <<< LiftF
 liftF ∷ ∀ r f a. f a → FreeV (LIFT f + r) a
 liftF = liftAt @"lift"
 
+handleLiftAt
+  ∷ ∀ @sym f g a r1 r1x r2
+  . Row.Cons sym (LiftF f) r1x r1
+  ⇒ Reflectable sym String
+  ⇒ (f ~> g)
+  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handleLiftAt nat = on @sym \(LiftF f) → nat f
+
+handleLift
+  ∷ ∀ f g a r1 r2
+  . (f ~> g)
+  → (FreeV' r1 r2 ~> g)
+  → (FreeV' (LIFT f + r1) r2 a → g a)
+handleLift = handleLiftAt @"lift"
+
 newtype MapF rec a = MapF (∀ r. (∀ x. (x → a) → rec x → r) → r)
 type MAP r = (map ∷ MapF | r)
 
@@ -135,6 +151,24 @@ mapF = mapAt @"map"
 
 instance (TypeEquals r (MAP + rx)) ⇒ Functor (FreeV r) where
   map f a = fromNatF $ f `mapF` toNatF a
+
+handleMapAt
+  ∷ ∀ @sym g a r1 r1x r2
+  . Row.Cons sym MapF r1x r1
+  ⇒ Reflectable sym String
+  ⇒ Functor g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handleMapAt rec = on @sym \(MapF wrapper) → wrapper \f a → f <$> rec a
+
+handleMap
+  ∷ ∀ g r1 r2
+  . Functor g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1 r2 ~> g)
+  → (FreeV' (MAP + r1) r2 ~> g)
+handleMap = handleMapAt @"map"
 
 newtype ApplyF rec a = ApplyF (∀ r. (∀ x. rec (x → a) → rec x → r) → r)
 type APPLY r = (apply ∷ ApplyF | r)
@@ -157,6 +191,24 @@ applyF = applyAt @"apply"
 
 instance (TypeEquals r (MAP + APPLY + rx)) ⇒ Apply (FreeV r) where
   apply f a = fromNatF $ toNatF f `applyF` toNatF a
+
+handleApplyAt
+  ∷ ∀ @sym g a r1 r1x r2
+  . Row.Cons sym ApplyF r1x r1
+  ⇒ Reflectable sym String
+  ⇒ Apply g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handleApplyAt rec = on @sym \(ApplyF wrapper) → wrapper \f a → rec f <*> rec a
+
+handleApply
+  ∷ ∀ g r1 r2
+  . Apply g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1 r2 ~> g)
+  → (FreeV' (APPLY + r1) r2 ~> g)
+handleApply = handleApplyAt @"apply"
 
 newtype SelectF rec a = SelectF
   (∀ r. (∀ x. rec (Either x a) → rec (x → a) → r) → r)
@@ -182,6 +234,24 @@ selectF = selectAt @"select"
 instance (TypeEquals r (MAP + APPLY + SELECT + rx)) ⇒ Select (FreeV r) where
   select e f = fromNatF $ toNatF e `selectF` toNatF f
 
+handleSelectAt
+  ∷ ∀ @sym g a r1 r1x r2
+  . Row.Cons sym SelectF r1x r1
+  ⇒ Reflectable sym String
+  ⇒ Select g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handleSelectAt rec = on @sym \(SelectF wrapper) → wrapper \e f → rec e <*? rec f
+
+handleSelect
+  ∷ ∀ g r1 r2
+  . Select g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1 r2 ~> g)
+  → (FreeV' (SELECT + r1) r2 ~> g)
+handleSelect = handleSelectAt @"select"
+
 newtype BindF rec a = BindF (∀ r. (∀ x. rec x → (x → rec a) → r) → r)
 type BIND r = (bind ∷ BindF | r)
 
@@ -200,6 +270,25 @@ bindF = bindAt @"bind"
 
 instance (TypeEquals r (MAP + APPLY + SELECT + BIND + rx)) ⇒ Bind (FreeV r) where
   bind a f = fromNatF $ toNatF a `bindF` (f >>> toNatF)
+
+handleBindAt
+  ∷ ∀ @sym g a r1 r1x r2
+  . Row.Cons sym BindF r1x r1
+  ⇒ Reflectable sym String
+  ⇒ Bind g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handleBindAt rec = on @sym
+  \(BindF wrapper) → wrapper \a f → rec a >>= (f >>> rec)
+
+handleBind
+  ∷ ∀ g r1 r2
+  . Bind g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1 r2 ~> g)
+  → (FreeV' (BIND + r1) r2 ~> g)
+handleBind = handleBindAt @"bind"
 
 newtype PureF ∷ (Type → Type) → Type → Type
 newtype PureF rec a = PureF a
@@ -227,6 +316,22 @@ instance
   ) ⇒
   Monad (FreeV r)
 
+handlePureAt
+  ∷ ∀ @sym g a r1 r1x r2
+  . Row.Cons sym PureF r1x r1
+  ⇒ Reflectable sym String
+  ⇒ Applicative g
+  ⇒ (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handlePureAt = on @sym \(PureF a) → pure a
+
+handlePure
+  ∷ ∀ g r1 r2
+  . Applicative g
+  ⇒ (FreeV' r1 r2 ~> g)
+  → (FreeV' (PURE + r1) r2 ~> g)
+handlePure = handlePureAt @"pure"
+
 data AltF ∷ (Type → Type) → Type → Type
 data AltF rec a = AltF (rec a) (rec a)
 
@@ -246,6 +351,24 @@ altF = altAt @"alt"
 
 instance (TypeEquals r (MAP + APPLY + ALT + rx)) ⇒ Alt (FreeV r) where
   alt a b = fromNatF $ toNatF a `altF` toNatF b
+
+handleAltAt
+  ∷ ∀ @sym g a r1 r1x r2
+  . Row.Cons sym AltF r1x r1
+  ⇒ Reflectable sym String
+  ⇒ Alt g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handleAltAt rec = on @sym \(AltF a b) → rec a <|> rec b
+
+handleAlt
+  ∷ ∀ g r1 r2
+  . Alt g
+  ⇒ (FreeV r2 ~> g)
+  → (FreeV' r1 r2 ~> g)
+  → (FreeV' (ALT + r1) r2 ~> g)
+handleAlt = handleAltAt @"alt"
 
 data EmptyF ∷ (Type → Type) → Type → Type
 data EmptyF rec a = EmptyF
@@ -271,3 +394,19 @@ instance
   ( TypeEquals r (MAP + APPLY + SELECT + BIND + PURE + ALT + EMPTY + rx)
   ) ⇒
   MonadPlus (FreeV r)
+
+handleEmptyAt
+  ∷ ∀ @sym g a r1 r1x r2
+  . Row.Cons sym EmptyF r1x r1
+  ⇒ Reflectable sym String
+  ⇒ Plus g
+  ⇒ (FreeV' r1x r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+handleEmptyAt = on @sym \EmptyF → empty
+
+handleEmpty
+  ∷ ∀ g r1 r2
+  . Plus g
+  ⇒ (FreeV' r1 r2 ~> g)
+  → (FreeV' (EMPTY + r1) r2 ~> g)
+handleEmpty = handleEmptyAt @"empty"
