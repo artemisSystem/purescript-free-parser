@@ -9,7 +9,15 @@ import Prim.Row as Row
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
-foreign import data VariantRec ∷ Row ((Type → Type) → Type → Type) → Type → Type
+-- | First parameter is possible outer options
+-- | Second parameter is possible inner options
+foreign import data VariantRec'
+  ∷ Row ((Type → Type) → Type → Type)
+  → Row ((Type → Type) → Type → Type)
+  → Type
+  → Type
+
+type VariantRec row = VariantRec' row row
 
 type VariantRecRep ∷ ∀ k1 k2. (k1 → k2 → Type) → k1 → k2 → Type
 type VariantRecRep f rec a =
