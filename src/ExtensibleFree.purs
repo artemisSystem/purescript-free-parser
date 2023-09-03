@@ -349,7 +349,7 @@ altAt a b = inj @sym $ AltF a b
 altF ∷ ∀ r a. FreeV (ALT + r) a → FreeV (ALT + r) a → FreeV (ALT + r) a
 altF = altAt @"alt"
 
-instance (TypeEquals r (MAP + APPLY + ALT + rx)) ⇒ Alt (FreeV r) where
+instance (TypeEquals r (MAP + ALT + rx)) ⇒ Alt (FreeV r) where
   alt a b = fromNatF $ toNatF a `altF` toNatF b
 
 handleAltAt
@@ -382,7 +382,7 @@ emptyAt = inj @sym $ EmptyF
 emptyF ∷ ∀ r a. FreeV (EMPTY + r) a
 emptyF = emptyAt @"empty"
 
-instance (TypeEquals r (MAP + APPLY + ALT + EMPTY + rx)) ⇒ Plus (FreeV r) where
+instance (TypeEquals r (MAP + ALT + EMPTY + rx)) ⇒ Plus (FreeV r) where
   empty = fromNatF emptyF
 
 instance
