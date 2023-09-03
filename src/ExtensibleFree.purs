@@ -9,28 +9,93 @@ import Control.Plus (class Plus)
 import Control.Select (class Select)
 import Control.Selective (class Selective)
 import Data.Either (Either)
-import Data.Newtype (class Newtype, un)
-import Data.Reflectable (class Reflectable)
+import Data.Maybe (Maybe(..))
+import Data.Reflectable (class Reflectable, reflectType)
+import Partial.Unsafe (unsafeCrashWith)
 import Prim.Row as Row
 import Type.Equality (class TypeEquals, proof)
+import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
-import VariantRec (VariantRec, inj)
+import Unsafe.Coerce (unsafeCoerce)
 
-newtype ToNatF ∷ ∀ k1 k2. (k1 → k2 → Type) → k1 → k1 → Type
-newtype ToNatF f a b = ToNatF (f a ~> f b)
+-- | First parameter is possible outer options
+-- | Second parameter is possible inner options
+foreign import data FreeV'
+  ∷ Row ((Type → Type) → Type → Type)
+  → Row ((Type → Type) → Type → Type)
+  → Type
+  → Type
 
-toNatF ∷ ∀ @f @a @b. TypeEquals a b ⇒ f a ~> f b
+type FreeV row = FreeV' row row
+
+type FreeVRep ∷ ∀ k1 k2. (k1 → k2 → Type) → k1 → k2 → Type
+type FreeVRep f rec a =
+  { type ∷ String
+  , value ∷ f rec a
+  }
+
+inj
+  ∷ ∀ @sym f rx r a
+  . Reflectable sym String
+  ⇒ Row.Cons sym f rx r
+  ⇒ f (FreeV r) a
+  → FreeV r a
+inj value = coerceV { type: reflectType @sym Proxy, value }
+  where
+  coerceV ∷ FreeVRep f (FreeV r) a → FreeV r a
+  coerceV = unsafeCoerce
+
+prj
+  ∷ ∀ @sym f rx r a
+  . Reflectable sym String
+  ⇒ Row.Cons sym f rx r
+  ⇒ FreeV r a
+  → Maybe (f (FreeV r) a)
+prj = on @sym Just \_ → Nothing
+
+on
+  ∷ ∀ @sym f a b rx r
+  . Row.Cons sym f rx r
+  ⇒ Reflectable sym String
+  ⇒ (f (FreeV r) a → b)
+  → (FreeV rx a → b)
+  → FreeV r a
+  → b
+on matching other variant = case coerceV variant of
+  { type: t, value } →
+    if t == reflectType @sym Proxy then matching value
+    else other (reduce variant)
+  where
+  coerceV ∷ FreeV r a → FreeVRep f (FreeV r) a
+  coerceV = unsafeCoerce
+
+  reduce ∷ FreeV r a → FreeV rx a
+  reduce = unsafeCoerce
+
+case_ ∷ ∀ a b. FreeV () a → b
+case_ variant = unsafeCrashWith $
+  "FreeV: pattern match failure on " <> (coerceV variant).type
+  where
+  coerceV ∷ ∀ f. FreeV () a → FreeVRep f (FreeV ()) a
+  coerceV = unsafeCoerce
+
+default ∷ ∀ r a b. a → FreeV r b → a
+default a _ = a
+
+expand ∷ ∀ lt mix gt a. Row.Union lt mix gt ⇒ FreeV lt a → FreeV gt a
+expand = unsafeCoerce
+
+newtype ToNatF ∷ ∀ k1 k2. (k1 → k1 → k2 → Type) → k1 → k1 → Type
+newtype ToNatF f a b = ToNatF (f a a ~> f b b)
+
+toNatF ∷ ∀ @f @a @b. TypeEquals a b ⇒ f a a ~> f b b
 toNatF = case proof (ToNatF \x → x) of ToNatF f → f
 
-newtype FromNatF ∷ ∀ k1 k2. (k1 → k2 → Type) → k1 → k1 → Type
-newtype FromNatF f a b = FromNatF (f b ~> f a)
+newtype FromNatF ∷ ∀ k1 k2. (k1 → k1 → k2 → Type) → k1 → k1 → Type
+newtype FromNatF f a b = FromNatF (f b b ~> f a a)
 
-fromNatF ∷ ∀ @f @a @b. TypeEquals a b ⇒ f b ~> f a
+fromNatF ∷ ∀ @f @a @b. TypeEquals a b ⇒ f b b ~> f a a
 fromNatF = case proof (FromNatF \x → x) of FromNatF f → f
-
-newtype Free r a = Free (VariantRec r a)
-
-derive instance Newtype (Free r a) _
 
 newtype LiftF ∷ (Type → Type) → (Type → Type) → Type → Type
 newtype LiftF f rec a = LiftF (f a)
@@ -42,10 +107,10 @@ liftAt
   . Reflectable sym String
   ⇒ Row.Cons sym (LiftF f) rx r
   ⇒ f a
-  → Free r a
-liftAt = Free <<< inj @sym <<< LiftF
+  → FreeV r a
+liftAt = inj @sym <<< LiftF
 
-liftF ∷ ∀ r f a. f a → Free (LIFT f + r) a
+liftF ∷ ∀ r f a. f a → FreeV (LIFT f + r) a
 liftF = liftAt @"lift"
 
 newtype MapF rec a = MapF (∀ r. (∀ x. (x → a) → rec x → r) → r)
@@ -56,14 +121,14 @@ mapAt
   . Reflectable sym String
   ⇒ Row.Cons sym MapF rx r
   ⇒ (a → b)
-  → Free r a
-  → Free r b
-mapAt f (Free a) = Free $ inj @sym $ MapF \r → r f a
+  → FreeV r a
+  → FreeV r b
+mapAt f a = inj @sym $ MapF \r → r f a
 
-mapF ∷ ∀ r a b. (a → b) → Free (MAP + r) a → Free (MAP + r) b
+mapF ∷ ∀ r a b. (a → b) → FreeV (MAP + r) a → FreeV (MAP + r) b
 mapF = mapAt @"map"
 
-instance (TypeEquals r (MAP + rx)) ⇒ Functor (Free r) where
+instance (TypeEquals r (MAP + rx)) ⇒ Functor (FreeV r) where
   map f a = fromNatF $ f `mapF` toNatF a
 
 newtype ApplyF rec a = ApplyF (∀ r. (∀ x. rec (x → a) → rec x → r) → r)
@@ -73,19 +138,19 @@ applyAt
   ∷ ∀ @sym rx r a b
   . Reflectable sym String
   ⇒ Row.Cons sym ApplyF rx r
-  ⇒ Free r (a → b)
-  → Free r a
-  → Free r b
-applyAt (Free f) (Free a) = Free $ inj @sym $ ApplyF \r → r f a
+  ⇒ FreeV r (a → b)
+  → FreeV r a
+  → FreeV r b
+applyAt f a = inj @sym $ ApplyF \r → r f a
 
 applyF
   ∷ ∀ r a b
-  . Free (APPLY + r) (a → b)
-  → Free (APPLY + r) a
-  → Free (APPLY + r) b
+  . FreeV (APPLY + r) (a → b)
+  → FreeV (APPLY + r) a
+  → FreeV (APPLY + r) b
 applyF = applyAt @"apply"
 
-instance (TypeEquals r (MAP + APPLY + rx)) ⇒ Apply (Free r) where
+instance (TypeEquals r (MAP + APPLY + rx)) ⇒ Apply (FreeV r) where
   apply f a = fromNatF $ toNatF f `applyF` toNatF a
 
 newtype SelectF rec a = SelectF
@@ -97,19 +162,19 @@ selectAt
   ∷ ∀ @sym rx r a b
   . Reflectable sym String
   ⇒ Row.Cons sym SelectF rx r
-  ⇒ Free r (Either a b)
-  → Free r (a → b)
-  → Free r b
-selectAt (Free e) (Free f) = Free $ inj @sym $ SelectF \r → r e f
+  ⇒ FreeV r (Either a b)
+  → FreeV r (a → b)
+  → FreeV r b
+selectAt e f = inj @sym $ SelectF \r → r e f
 
 selectF
   ∷ ∀ r a b
-  . Free (SELECT + r) (Either a b)
-  → Free (SELECT + r) (a → b)
-  → Free (SELECT + r) b
+  . FreeV (SELECT + r) (Either a b)
+  → FreeV (SELECT + r) (a → b)
+  → FreeV (SELECT + r) b
 selectF = selectAt @"select"
 
-instance (TypeEquals r (MAP + APPLY + SELECT + rx)) ⇒ Select (Free r) where
+instance (TypeEquals r (MAP + APPLY + SELECT + rx)) ⇒ Select (FreeV r) where
   select e f = fromNatF $ toNatF e `selectF` toNatF f
 
 newtype BindF rec a = BindF (∀ r. (∀ x. rec x → (x → rec a) → r) → r)
@@ -119,15 +184,16 @@ bindAt
   ∷ ∀ @sym rx r a b
   . Reflectable sym String
   ⇒ Row.Cons sym BindF rx r
-  ⇒ Free r a
-  → (a → Free r b)
-  → Free r b
-bindAt (Free a) f = Free $ inj @sym $ BindF \r → r a (f >>> un Free)
+  ⇒ FreeV r a
+  → (a → FreeV r b)
+  → FreeV r b
+bindAt a f = inj @sym $ BindF \r → r a f
 
-bindF ∷ ∀ r a b. Free (BIND + r) a → (a → Free (BIND + r) b) → Free (BIND + r) b
+bindF
+  ∷ ∀ r a b. FreeV (BIND + r) a → (a → FreeV (BIND + r) b) → FreeV (BIND + r) b
 bindF = bindAt @"bind"
 
-instance (TypeEquals r (MAP + APPLY + SELECT + BIND + rx)) ⇒ Bind (Free r) where
+instance (TypeEquals r (MAP + APPLY + SELECT + BIND + rx)) ⇒ Bind (FreeV r) where
   bind a f = fromNatF $ toNatF a `bindF` (f >>> toNatF)
 
 newtype PureF ∷ (Type → Type) → Type → Type
@@ -140,21 +206,21 @@ pureAt
   . Reflectable sym String
   ⇒ Row.Cons sym PureF rx r
   ⇒ a
-  → Free r a
-pureAt a = Free $ inj @sym $ PureF a
+  → FreeV r a
+pureAt a = inj @sym $ PureF a
 
-pureF ∷ ∀ r a. a → Free (PURE + r) a
+pureF ∷ ∀ r a. a → FreeV (PURE + r) a
 pureF = pureAt @"pure"
 
-instance (TypeEquals r (MAP + APPLY + PURE + rx)) ⇒ Applicative (Free r) where
+instance (TypeEquals r (MAP + APPLY + PURE + rx)) ⇒ Applicative (FreeV r) where
   pure a = fromNatF $ pureF a
 
-instance (TypeEquals r (MAP + APPLY + SELECT + PURE + rx)) ⇒ Selective (Free r)
+instance (TypeEquals r (MAP + APPLY + SELECT + PURE + rx)) ⇒ Selective (FreeV r)
 
 instance
   ( TypeEquals r (MAP + APPLY + SELECT + BIND + PURE + rx)
   ) ⇒
-  Monad (Free r)
+  Monad (FreeV r)
 
 data AltF ∷ (Type → Type) → Type → Type
 data AltF rec a = AltF (rec a) (rec a)
@@ -165,15 +231,15 @@ altAt
   ∷ ∀ @sym rx r a
   . Reflectable sym String
   ⇒ Row.Cons sym AltF rx r
-  ⇒ Free r a
-  → Free r a
-  → Free r a
-altAt (Free a) (Free b) = Free $ inj @sym $ AltF a b
+  ⇒ FreeV r a
+  → FreeV r a
+  → FreeV r a
+altAt a b = inj @sym $ AltF a b
 
-altF ∷ ∀ r a. Free (ALT + r) a → Free (ALT + r) a → Free (ALT + r) a
+altF ∷ ∀ r a. FreeV (ALT + r) a → FreeV (ALT + r) a → FreeV (ALT + r) a
 altF = altAt @"alt"
 
-instance (TypeEquals r (MAP + APPLY + ALT + rx)) ⇒ Alt (Free r) where
+instance (TypeEquals r (MAP + APPLY + ALT + rx)) ⇒ Alt (FreeV r) where
   alt a b = fromNatF $ toNatF a `altF` toNatF b
 
 data EmptyF ∷ (Type → Type) → Type → Type
@@ -182,21 +248,21 @@ data EmptyF rec a = EmptyF
 type EMPTY r = (empty ∷ EmptyF | r)
 
 emptyAt
-  ∷ ∀ @sym rx r a. Reflectable sym String ⇒ Row.Cons sym EmptyF rx r ⇒ Free r a
-emptyAt = Free $ inj @sym $ EmptyF
+  ∷ ∀ @sym rx r a. Reflectable sym String ⇒ Row.Cons sym EmptyF rx r ⇒ FreeV r a
+emptyAt = inj @sym $ EmptyF
 
-emptyF ∷ ∀ r a. Free (EMPTY + r) a
+emptyF ∷ ∀ r a. FreeV (EMPTY + r) a
 emptyF = emptyAt @"empty"
 
-instance (TypeEquals r (MAP + APPLY + ALT + EMPTY + rx)) ⇒ Plus (Free r) where
+instance (TypeEquals r (MAP + APPLY + ALT + EMPTY + rx)) ⇒ Plus (FreeV r) where
   empty = fromNatF emptyF
 
 instance
   ( TypeEquals r (MAP + APPLY + PURE + ALT + EMPTY + rx)
   ) ⇒
-  Alternative (Free r)
+  Alternative (FreeV r)
 
 instance
   ( TypeEquals r (MAP + APPLY + SELECT + BIND + PURE + ALT + EMPTY + rx)
   ) ⇒
-  MonadPlus (Free r)
+  MonadPlus (FreeV r)
