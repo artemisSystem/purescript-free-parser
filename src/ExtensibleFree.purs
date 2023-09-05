@@ -122,15 +122,15 @@ handleLiftAt
   ∷ ∀ @sym f g a r1 r1x r2
   . Row.Cons sym (LiftF f) r1x r1
   ⇒ Reflectable sym String
-  ⇒ (f ~> g)
-  → (FreeV' r1x r2 ~> g)
+  ⇒ (f a → g a)
+  → (FreeV' r1x r2 a → g a)
   → (FreeV' r1 r2 a → g a)
 handleLiftAt nat = on @sym \(LiftF f) → nat f
 
 handleLift
   ∷ ∀ f g a r1 r2
-  . (f ~> g)
-  → (FreeV' r1 r2 ~> g)
+  . (f a → g a)
+  → (FreeV' r1 r2 a → g a)
   → (FreeV' (LIFT f + r1) r2 a → g a)
 handleLift = handleLiftAt @"lift"
 
@@ -158,16 +158,16 @@ handleMapAt
   ⇒ Reflectable sym String
   ⇒ Functor g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1x r2 a → g a)
   → (FreeV' r1 r2 a → g a)
 handleMapAt rec = on @sym \(MapF wrapper) → wrapper \f a → f <$> rec a
 
 handleMap
-  ∷ ∀ g r1 r2
+  ∷ ∀ g a r1 r2
   . Functor g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1 r2 ~> g)
-  → (FreeV' (MAP + r1) r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+  → (FreeV' (MAP + r1) r2 a → g a)
 handleMap = handleMapAt @"map"
 
 newtype ApplyF rec a = ApplyF (∀ r. (∀ x. rec (x → a) → rec x → r) → r)
@@ -198,16 +198,16 @@ handleApplyAt
   ⇒ Reflectable sym String
   ⇒ Apply g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1x r2 a → g a)
   → (FreeV' r1 r2 a → g a)
 handleApplyAt rec = on @sym \(ApplyF wrapper) → wrapper \f a → rec f <*> rec a
 
 handleApply
-  ∷ ∀ g r1 r2
+  ∷ ∀ g a r1 r2
   . Apply g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1 r2 ~> g)
-  → (FreeV' (APPLY + r1) r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+  → (FreeV' (APPLY + r1) r2 a → g a)
 handleApply = handleApplyAt @"apply"
 
 newtype SelectF rec a = SelectF
@@ -240,16 +240,16 @@ handleSelectAt
   ⇒ Reflectable sym String
   ⇒ Select g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1x r2 a → g a)
   → (FreeV' r1 r2 a → g a)
 handleSelectAt rec = on @sym \(SelectF wrapper) → wrapper \e f → rec e <*? rec f
 
 handleSelect
-  ∷ ∀ g r1 r2
+  ∷ ∀ g a r1 r2
   . Select g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1 r2 ~> g)
-  → (FreeV' (SELECT + r1) r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+  → (FreeV' (SELECT + r1) r2 a → g a)
 handleSelect = handleSelectAt @"select"
 
 newtype BindF rec a = BindF (∀ r. (∀ x. rec x → (x → rec a) → r) → r)
@@ -277,17 +277,17 @@ handleBindAt
   ⇒ Reflectable sym String
   ⇒ Bind g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1x r2 a → g a)
   → (FreeV' r1 r2 a → g a)
 handleBindAt rec = on @sym
   \(BindF wrapper) → wrapper \a f → rec a >>= (f >>> rec)
 
 handleBind
-  ∷ ∀ g r1 r2
+  ∷ ∀ g a r1 r2
   . Bind g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1 r2 ~> g)
-  → (FreeV' (BIND + r1) r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+  → (FreeV' (BIND + r1) r2 a → g a)
 handleBind = handleBindAt @"bind"
 
 newtype PureF ∷ (Type → Type) → Type → Type
@@ -321,15 +321,15 @@ handlePureAt
   . Row.Cons sym PureF r1x r1
   ⇒ Reflectable sym String
   ⇒ Applicative g
-  ⇒ (FreeV' r1x r2 ~> g)
+  ⇒ (FreeV' r1x r2 a → g a)
   → (FreeV' r1 r2 a → g a)
 handlePureAt = on @sym \(PureF a) → pure a
 
 handlePure
-  ∷ ∀ g r1 r2
+  ∷ ∀ g a r1 r2
   . Applicative g
-  ⇒ (FreeV' r1 r2 ~> g)
-  → (FreeV' (PURE + r1) r2 ~> g)
+  ⇒ (FreeV' r1 r2 a → g a)
+  → (FreeV' (PURE + r1) r2 a → g a)
 handlePure = handlePureAt @"pure"
 
 data AltF ∷ (Type → Type) → Type → Type
@@ -358,16 +358,16 @@ handleAltAt
   ⇒ Reflectable sym String
   ⇒ Alt g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1x r2 ~> g)
+  → (FreeV' r1x r2 a → g a)
   → (FreeV' r1 r2 a → g a)
 handleAltAt rec = on @sym \(AltF a b) → rec a <|> rec b
 
 handleAlt
-  ∷ ∀ g r1 r2
+  ∷ ∀ g a r1 r2
   . Alt g
   ⇒ (FreeV r2 ~> g)
-  → (FreeV' r1 r2 ~> g)
-  → (FreeV' (ALT + r1) r2 ~> g)
+  → (FreeV' r1 r2 a → g a)
+  → (FreeV' (ALT + r1) r2 a → g a)
 handleAlt = handleAltAt @"alt"
 
 data EmptyF ∷ (Type → Type) → Type → Type
@@ -405,8 +405,8 @@ handleEmptyAt
 handleEmptyAt = on @sym \EmptyF → empty
 
 handleEmpty
-  ∷ ∀ g r1 r2
+  ∷ ∀ g a r1 r2
   . Plus g
   ⇒ (FreeV' r1 r2 ~> g)
-  → (FreeV' (EMPTY + r1) r2 ~> g)
+  → (FreeV' (EMPTY + r1) r2 a → g a)
 handleEmpty = handleEmptyAt @"empty"
